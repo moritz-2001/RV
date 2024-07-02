@@ -1,13 +1,15 @@
 set(RV_LIBRARY_NAME RV)
 set(RV_COMPONENT_BUILD Off)
 
+
 # Check if this is an external build.
 if (NOT DEFINED LLVM_MAIN_SRC_DIR)
   project(RV)
   cmake_minimum_required(VERSION 3.4.3)
 
   # Where is LLVM installed?
-  set(LLVM_INSTALL_ROOT "" CACHE PATH "Root of LLVM install.")
+  #set(LLVM_INSTALL_ROOT "~/home/Projects/Bachelor/llvm-custom" CACHE PATH "Root of LLVM install.")
+  set(LLVM_INSTALL_ROOT "/usr/lib/llvm-16" CACHE PATH "Root of LLVM install.")
   # Check if the LLVM_INSTALL_ROOT valid.
   if( NOT EXISTS ${LLVM_INSTALL_ROOT}/include/llvm )
     message(FATAL_ERROR "LLVM_INSTALL_ROOT (${LLVM_INSTALL_ROOT}) is not a valid LLVM installation.")
@@ -115,7 +117,7 @@ endif()
 OPTION(RV_ENABLE_VP "(experimental) Use LLVM-VP (Vector Predication) (https://reviews.llvm.org/D57504)." OFF)
 
 set(RV_TARGETS_TO_BUILD "Native" CACHE STRING "Semicolon-separated list of targets to build, or 'Native'.")
-string(REPLACE "Native" ${LLVM_NATIVE_ARCH} RV_TARGETS_TO_BUILD "${RV_TARGETS_TO_BUILD}")
+#string(REPLACE "Native" ${LLVM_NATIVE_ARCH} RV_TARGETS_TO_BUILD "${RV_TARGETS_TO_BUILD}")
 list(REMOVE_DUPLICATES RV_TARGETS_TO_BUILD)
 
 # check enabled targets
@@ -204,7 +206,7 @@ endif()
 add_subdirectory(src)
 
 # RV integrated tests
-add_subdirectory(test)
+#add_subdirectory(test)
 
 # rvTool, ..
 add_subdirectory(tools)

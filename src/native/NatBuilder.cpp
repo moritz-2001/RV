@@ -334,8 +334,21 @@ void NatBuilder::vectorize(bool embedRegion, ValueToValueMapTy * vecInstMap) {
     new UnreachableInst(oldBB->getContext(), oldBB);
     while (oldBB->size() > 1) {
       auto I = oldBB->begin();
-      if (!I->getType()->isVoidTy())
+
+      if (!I->getType()->isVoidTy()) {
+        //outs() << "REPLACE USES OF " << *I << "\n";
+        for (auto user : I->users()) {
+          if (auto instr = dyn_cast<llvm::Instruction>(user)) {
+            if (std::all_of(oldBlocks.begin(), oldBlocks.end(), [&](BasicBlock* BB) {
+              return instr->getParent() != I->getParent();
+            })) {
+              //outs() << "REPLACE " << *I << " WITH " << *(*vecInstMap)[&*I] << "\n";
+              instr->replaceUsesOfWith(&*I, (*vecInstMap)[&*I]);
+            }
+          }
+        }
         I->replaceAllUsesWith(UndefValue::get(I->getType()));
+      }
       I->eraseFromParent();
     }
     // TODO: LoopInfo (probably) keeps an asserting handle on the old loop
@@ -444,6 +457,7 @@ void NatBuilder::vectorize(BasicBlock *const bb, BasicBlock *vecBlock) {
         case RVIntrinsic::EntryMask: mapVectorValue(call, vecMaskArg); break;
         case RVIntrinsic::Any: vectorizeReductionCall(call, false); break;
         case RVIntrinsic::All: vectorizeReductionCall(call, true); break;
+        case RVIntrinsic::Reduce: vectorizeRealReductionCall(call); break;
         case RVIntrinsic::Extract: vectorizeExtractCall(call); break;
         case RVIntrinsic::Insert: vectorizeInsertCall(call); break;
         case RVIntrinsic::Compact: vectorizeCompactCall(call); break;
@@ -1047,6 +1061,9 @@ void
 NatBuilder::vectorizeExtractCall(CallInst *rvCall) {
   ++numRVIntrinsics;
 
+  if (rvCall->arg_size() != 2) {
+    llvm::outs() << *rvCall << "\n";
+  }
   assert(rvCall->arg_size() == 2 && "expected 2 arguments for rv_extract(vec, laneId)");
 
   Value *vecArg = rvCall->getArgOperand(0);
@@ -3392,6 +3409,47 @@ NatBuilder::getMappedBlocks(BasicBlock *const block) {
 
   assert(blockIt != basicBlockMap.end() && "no mapped blocks for block!");
   return blockIt->second;
+}
+
+void NatBuilder::vectorizeRealReductionCall(llvm::CallInst *rvCall) {
+  ++numRVIntrinsics;
+
+  if (rvCall->arg_size() != 2) {
+    llvm::outs() << *rvCall << "\n";
+  }
+  assert(rvCall->arg_size() == 2 && "expected 2 arguments for rv_reduce(vec)");
+  Value *vecArg = rvCall->getArgOperand(0);
+  auto redType = dyn_cast<llvm::ConstantInt>(rvCall->getArgOperand(1))->getValue();
+
+  // uniform arg
+  //if (getVectorShape(*vecArg).isUniform()) {
+  //  auto * uniVal = requestScalarValue(vecArg);
+  //  mapScalarValue(rvCall, uniVal);
+  //  assert(not "TODO");
+  //  std::exit(1);
+  //  return;
+  //}
+
+  // non-uniform arg
+  auto * vecVal = requestVectorValue(vecArg);
+
+  llvm::outs() << "REDUCTION \n";
+
+  assert(vecArg->getType()->isIntegerTy());
+  CallInst* val = nullptr;
+  if (redType == 0) {
+    val = builder.CreateAddReduce(vecVal);
+  } else if (redType == 1) {
+    val = builder.CreateMulReduce(vecVal);
+  } else if (redType == 2) {
+    val = builder.CreateIntMinReduce(vecVal);
+  } else if (redType == 3) {
+    val = builder.CreateIntMaxReduce(vecVal);
+  } else {
+    assert(false and "reduction wrong input");
+  }
+  assert(val and "val is nullptr");
+  mapScalarValue(rvCall, val);
 }
 
 int

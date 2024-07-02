@@ -268,9 +268,29 @@ bool LoopVectorizer::scoreLoop(LoopJob &LJ, LoopScore &LS, Loop &L) {
   LoopMD mdAnnot = GetLoopAnnotation(L);
 
   if (mdAnnot.alreadyVectorized.safeGet(false)) {
-    Report() << "x already vectorized\n";
+    Report() << L.getName() << " already vectorized\n";
     return false;
   }
+
+  if (not mdAnnot.isWorkItemLoop) {
+    Report() << L.getName() << " is not work item loop\n";
+    return false;
+  }
+
+  const bool containsIntrinsic = [&] {
+    for (auto& BB : F) {
+      for (auto& I : BB) {
+        if (GetIntrinsicID(I) !=  RVIntrinsic::Unknown) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }();
+  if (not containsIntrinsic) {
+    return false;
+  }
+
 
   // Preserve user intent.
   if (mdAnnot.vectorizeEnable.safeGet(false))
@@ -774,8 +794,10 @@ LoopVectorizer::LoopVectorizer(Function &F, TargetTransformInfo &PassTTI,
 }
 
 bool LoopVectorizer::run() {
-  if (getenv("RV_DISABLE"))
-    return false;
+    if (not F.hasFnAttribute("iskernel")) {
+      return false;
+    }
+    llvm::outs() << "IS KERNEL\n";
 
   if (enableDiagOutput)
     Report() << "loopVecPass: run on " << F.getName() << "\n";

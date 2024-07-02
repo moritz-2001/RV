@@ -18,6 +18,9 @@
 #include "rv/passes/irPolisher.h"
 #include "rv/passes/AutoMathPass.h"
 
+#include <rv/passes/PrintPass.h>
+#include <rv/passes/lowerRVIntrinsics.h>
+
 using namespace llvm;
 
 cl::OptionCategory rvCategory("RV Options", "Configure the Region Vectorizer");
@@ -26,7 +29,7 @@ static cl::opt<bool> rvVectorizeEnabled(
     "rv",
     cl::desc("Enable Whole-Function and Outer-Loop Vectorization with RV "
              "(implies -rv-wfv and -rv-loopvec)."),
-    cl::init(true), cl::ZeroOrMore, cl::cat(rvCategory));
+    cl::init(false), cl::ZeroOrMore, cl::cat(rvCategory));
 
 static cl::opt<bool> rvLowerBuiltins("rv-lower",
                                      cl::desc("Lower RV specific builtins"),
@@ -114,38 +117,30 @@ void rv::addConfiguredRVPasses(PassBuilder &PB) {
   PB.registerPipelineStartEPCallback(
       [&](llvm::ModulePassManager &MPM,
           llvm::OptimizationLevel Level) {
-        if (Level.getSpeedupLevel() < 3)
-          return;
-        if (rvPrep || mayVectorize())
-          rv::addPreparatoryPasses(MPM);
+        //llvm::FunctionPassManager FPM;
+        addPreparatoryPasses(MPM);
+        //MPM.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(FPM)));
       });
 
   PB.registerVectorizerStartEPCallback(
       [&](llvm::FunctionPassManager &FPM,
           llvm::OptimizationLevel Level) {
-        if (Level.getSpeedupLevel() < 3)
-          return;
-        if (rvOnlyPolish) {
-          FPM.addPass(rv::IRPolisherWrapperPass());
-          return;
-        }
-
-        if (shouldRunLoopVecPass()) {
+        addPreparatoryPasses(FPM);
+        if (rvVectorizeEnabled) {
           FPM.addPass(rv::LoopVectorizerWrapperPass());
         }
+        FPM.addPass(LowerRVIntrinsicsWrapperPass());
       });
+
 
   PB.registerOptimizerLastEPCallback(
       [&](llvm::ModulePassManager &MPM,
           llvm::OptimizationLevel Level) {
-        if (Level.getSpeedupLevel() < 3)
-          return;
-        if (shouldRunWFVPass())
+          llvm::FunctionPassManager FPM;
           MPM.addPass(rv::WFVWrapperPass());
-        if (shouldAutoVectorizeMath()) 
-          MPM.addPass(rv::AutoMathWrapperPass());
-        if (mayVectorize())
+          FPM.addPass(PrintPass());
           rv::addCleanupPasses(MPM);
+          MPM.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(FPM)));
       });
   // PB.registerPipelineParsingCallback(buildDefaultRVPipeline);
 }

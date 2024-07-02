@@ -106,7 +106,22 @@ GetLoopAnnotation(llvm::Loop & L) {
 
     StringRef text = Str->getString();
 
-    if (text.equals("llvm.loop.vectorize.enable")) {
+
+    if (auto* F = L.getExitBlock()->getParent()) {
+      if (F->hasFnAttribute("iskernel")) {
+        auto str = F->getFnAttribute("iskernel").getValueAsString();
+        int res = 1;
+        str.getAsInteger(10, res);
+        llvmAnnot.explicitVectorWidth =  res;
+        outs() <<  "explicitVectorWidth: " << res << "\n";
+      }
+    }
+
+    if (text.equals("hipSYCL.loop.workitemhipSYCL.loop.workitem")) {
+      llvmAnnot.vectorizeEnable = true;
+      llvmAnnot.isWorkItemLoop = true;
+      llvm::outs() << "VECTORIZE WITH WIDTH: " << llvmAnnot.explicitVectorWidth.get() << "\n";
+    } else if (text.equals("llvm.loop.vectorize.enable")) {
       const bool vectorizeEnable = !Cst->getValue()->isNullValue();
       llvmAnnot.vectorizeEnable = vectorizeEnable;
       if (vectorizeEnable && !llvmAnnot.minDepDist.isSet()) {

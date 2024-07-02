@@ -160,6 +160,8 @@ if (NOT RV_COMPONENT_BUILD)
   endif()
 endif()
 
+#target_include_directories(RV PRIVATE ./)
+
 # # Build a monolithic libRV.a and a thin module LLVMRV.moduleext that links to
 # # that static library.
 # if (MSVC)

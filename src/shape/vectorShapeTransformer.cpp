@@ -96,6 +96,12 @@ VectorShapeTransformer::computeShape(const Instruction& I, SmallValVec & tainted
   return NewShape;
 }
 
+bool IsConvertedFromIntrinsic(const Value& v, RVIntrinsic intrin) {
+  if(IsIntrinsic(v, intrin)) return true;
+  if(auto *conv = dyn_cast<ZExtInst>(&v))
+    if(IsIntrinsic(*conv, intrin)) return true;
+}
+
 VectorShape
 VectorShapeTransformer::computeIdealShapeForInst(const Instruction& I, SmallValVec & taintedOps) const {
   // always default to the naive transformer (only top or bottom)
@@ -163,6 +169,25 @@ VectorShapeTransformer::computeIdealShapeForInst(const Instruction& I, SmallValV
 
           if (stride >= 0 && alignment >= stride * vectorWidth)
             return VectorShape::uni();
+/*
+          switch(predicate) {
+          case CmpInst::Predicate::ICMP_SGT:
+          case CmpInst::Predicate::ICMP_UGT:
+          case CmpInst::Predicate::ICMP_SLT:
+          case CmpInst::Predicate::ICMP_ULT:
+            if (stride == 1 && (getObservedShape(BB, op1).getStride() == 1 || getObservedShape(BB, op2).getStride() == 1))
+              if (((getObservedShape(BB, op1).isContiguous() && IsConvertedFromIntrinsic(op2, RVIntrinsic::NumLanes))
+                  || (getObservedShape(BB, op2).isContiguous() && IsConvertedFromIntrinsic(op1, RVIntrinsic::NumLanes))))
+                return VectorShape::uni();
+            break;
+          case CmpInst::Predicate::ICMP_SGE:
+          case CmpInst::Predicate::ICMP_UGE:
+          case CmpInst::Predicate::ICMP_SLE:
+          case CmpInst::Predicate::ICMP_ULE:
+          default:
+            break;
+          }
+*/
 
         }
       break;

@@ -16,6 +16,8 @@
 
 namespace rv {
 
+void addPreparatoryPasses(llvm::FunctionPassManager &FPM);
+
 // add normalization passes required by RV (BEFORE)
 void addPreparatoryPasses(llvm::ModulePassManager &MPM);
 

@@ -19,10 +19,10 @@ namespace rv {
 std::string
 to_string(CallPredicateMode PredMode) {
   switch (PredMode) {
-    default: llvm_unreachable("unrecognized call predicate");
     case CallPredicateMode::Unpredicated: return "Unpredicated";
     case CallPredicateMode::PredicateArg: return "PredicateArg";
     case CallPredicateMode::SafeWithoutPredicate: return "SafeWithoutPredicate";
+    default: llvm_unreachable("unrecognized call predicate");
   }
 }
 

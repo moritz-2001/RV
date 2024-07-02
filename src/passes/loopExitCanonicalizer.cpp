@@ -63,13 +63,14 @@ bool LoopExitCanonicalizerLegacyPass::runOnFunction(Function &F) {
 ///// New PM Pass /////
 
 llvm::PreservedAnalyses rv::LoopExitCanonicalizerWrapperPass::run(Function &F, FunctionAnalysisManager &FAM) {
+   if (not F.hasFnAttribute("iskernel")) {
+      return llvm::PreservedAnalyses::all();
+   }
   LoopInfo &loopInfo = FAM.getResult<LoopAnalysis>(F);
 
   LoopExitCanonicalizer canonicalizer(loopInfo);
-  if (canonicalizer.canonicalize(F))
-    return llvm::PreservedAnalyses::none();
-  else
-    return llvm::PreservedAnalyses::all();
+  canonicalizer.canonicalize(F);
+  return llvm::PreservedAnalyses::none();
 }
 
 bool LoopExitCanonicalizer::canonicalize(Function &F) {

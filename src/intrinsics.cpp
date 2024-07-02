@@ -35,8 +35,9 @@ namespace rv {
 RVIntrinsic GetIntrinsicID(const llvm::Function& func) {
   auto funcName = func.getName();
 #define RV_MAP_INTRINSIC(FUNC, VALUE) \
-  if ( funcName.startswith(StringRef(#FUNC)) ) return RVIntrinsic:: VALUE;
+  if ( funcName.contains(StringRef(#FUNC)) ) return RVIntrinsic:: VALUE;
 #include "rv/intrinsics.def"
+
 #undef RV_MAP_INTRINSIC
 
   return RVIntrinsic::Unknown;
@@ -48,6 +49,7 @@ std::string GetIntrinsicName(RVIntrinsic id, Type * DataTy) {
 #define RV_MAP_INTRINSIC(FUNC, VALUE) \
   case RVIntrinsic:: VALUE : BaseName= #FUNC; break;
 #include "rv/intrinsics.def"
+
 #undef RV_MAP_INTRINSIC
   case RVIntrinsic::Unknown: break;
   default: abort();
@@ -234,6 +236,18 @@ GetIntrinsicMapping(Function & func, RVIntrinsic rvIntrin) {
         CallPredicateMode::SafeWithoutPredicate
         ));
     } break;
+
+  case RVIntrinsic::Reduce: {
+    return (VectorMapping(
+        &func,
+        &func,
+        0, // no specific vector width
+        -1, //
+        VectorShape::uni(),
+        {VectorShape::varying(), VectorShape::uni()},
+        CallPredicateMode::SafeWithoutPredicate
+        ));
+  } break;
 
     case RVIntrinsic::Compact: {
       return (VectorMapping(

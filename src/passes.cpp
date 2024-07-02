@@ -18,6 +18,7 @@
 #include "rv/passes/WFVPass.h"
 #include "rv/passes/loopExitCanonicalizer.h"
 #include "rv/passes/lowerRVIntrinsics.h"
+#include "rv/passes/PrintPass.h"
 
 #include "llvm/Transforms/Scalar/ADCE.h"
 #include "llvm/Transforms/Utils/LCSSA.h"
@@ -27,16 +28,18 @@
 
 #include "report.h"
 
+#include <rv/passes/NoInlinePass.h>
+
 using namespace llvm;
 
 namespace rv {
 
 void addPreparatoryPasses(FunctionPassManager &FPM) {
+  FPM.addPass(NoInlinePass());
   FPM.addPass(LoopSimplifyPass());
   FPM.addPass(LCSSAPass());
   FPM.addPass(
       LoopExitCanonicalizerWrapperPass()); // required for divLoopTrans
-  // FPM.addPass(LICMPass());
 }
 
 void addPreparatoryPasses(ModulePassManager &MPM) {

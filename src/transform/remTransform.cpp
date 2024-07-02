@@ -298,7 +298,7 @@ public:
     // dont test "phi", but "phi-1" if the cmp predicate is exit on equal
     int offByOne = redShape.getStride() < 0 ? -1 : 1;
 
-    offset = offset + offByOne * (int) (exitWhenEqual);
+    //offset = offset + offByOne * (exitWhenEqual ? 1 : 0);
 
   // emit the test
     auto & val = embReduct.val;
@@ -568,10 +568,12 @@ struct LoopTransformer {
       break;
     }
 
+
+
   // branch from vecToScalarExit to the scalarGuard
     // TODO add an early exit branch (whenever no iterations remain)
     auto * remainderCond = useTailPredication ? constFalse : constTrue;
-    BranchInst::Create(scalarGuardBlock, loopExit, remainderCond, vecToScalarExit);
+    BranchInst::Create(scalarGuardBlock, loopExit, constFalse, vecToScalarExit);
 
   // make scalarGuard the new preheader of the scalar loop
     BranchInst::Create(&scalarHead, scalarGuardBlock);
@@ -756,6 +758,8 @@ struct LoopTransformer {
         }
     );
 
+    //outs() << "Exit cond " << exitVal << " br: " << vecExitingBr << "\n";
+
     // use forwarded exit condition
     vecExitingBr.setCondition(&exitVal);
 
@@ -840,7 +844,7 @@ struct LoopTransformer {
       );
 
     // use forwarded exit condition
-    vecGuardBr.setCondition(&exitVal);
+    vecGuardBr.setCondition(ConstantInt::getFalse(builder.getContext()));
   }
 
   // replicate the scalar loop exit condition in vecToScalarExit
@@ -861,7 +865,7 @@ struct LoopTransformer {
     // Whether we need control from the vector loop exit to the scalar loop.
     if (!useTailPredication && (tripAlign % vectorWidth != 0)) {
       IF_DEBUG { errs() << "remTrans: need a scalar remainder loop.\n"; }
-    // replicate the exit condition
+      // replicate the exit condition
       // replace scalar reductors with their vector-loop versions
       auto & exitVal =
         ReplicateExpression(".v2s", *exitingBr.getCondition(), replMap,
@@ -883,7 +887,8 @@ struct LoopTransformer {
         builder
         );
 
-      vecExitBr.setCondition(&exitVal);
+      // We always exit to the loop exit and not to the scalarGuardBlock
+      vecExitBr.setCondition(llvm::ConstantInt::getTrue(builder.getContext()));
 
       // swap the exits to negate the condition
       if (exitSuccIdx == 0) {

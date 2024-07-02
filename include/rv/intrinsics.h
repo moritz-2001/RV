@@ -26,7 +26,7 @@ namespace rv {
 
   // predicate intrinsics
     EntryMask = 0, // rv_entry_mask() returns the region entry mask (implicit function argument).
-    All = 1, // rv_all(V) implies that all bits in the predicate V are set
+    All = 1, // rv_all(V) implies that  all bits in the predicate V are set
     Any = 2, // rv_any(V) implies that at least one bit in the predicate V is set
     Ballot = 3, // rv_ballot(V) returns the boolean vector predicate V as bits in an integer value (movmsk)
     PopCount = 4, // rv_popcount(V) returns the number of set bits in the predicate V
@@ -44,6 +44,8 @@ namespace rv {
     VecStore = 103, // rv_store(V)
     Shuffle = 104, // rv_shuffle(V, S) returns the varying value V shifted by constant S
     Align = 105, // rv_align(V, C) informs RV that V has the alignment constant C
+
+    Reduce = 200,
   };
 
   VectorMapping GetIntrinsicMapping(llvm::Function&, RVIntrinsic rvIntrin);

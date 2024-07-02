@@ -127,6 +127,7 @@ namespace rv {
     BasicBlockVector getMappedBlocks(llvm::BasicBlock *const bb);
 
   private:
+    void vectorizeRealReductionCall(llvm::CallInst * call);
     void vectorize(llvm::BasicBlock *const bb, llvm::BasicBlock *vecBlock);
     void vectorizeInstruction(llvm::Instruction *const inst);
     void vectorizePHIInstruction(llvm::PHINode *const scalPhi);
