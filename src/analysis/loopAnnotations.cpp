@@ -107,6 +107,8 @@ GetLoopAnnotation(llvm::Loop & L) {
     StringRef text = Str->getString();
 
 
+
+	if (L.getExitBlock()) {
     if (auto* F = L.getExitBlock()->getParent()) {
       if (F->hasFnAttribute("iskernel")) {
         auto str = F->getFnAttribute("iskernel").getValueAsString();
@@ -116,6 +118,7 @@ GetLoopAnnotation(llvm::Loop & L) {
         outs() <<  "explicitVectorWidth: " << res << "\n";
       }
     }
+	}
 
     if (text.equals("hipSYCL.loop.workitemhipSYCL.loop.workitem")) {
       llvmAnnot.vectorizeEnable = true;
