@@ -4,6 +4,7 @@
 #include "rv/legacy/passes.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
+#include <llvm/IR/Verifier.h>
 
 class PrintPass : public llvm::PassInfoMixin<PrintPass> {
 public:
@@ -13,8 +14,6 @@ public:
   llvm::PreservedAnalyses run(llvm::Function &F, llvm::FunctionAnalysisManager &) {
     if (F.hasFnAttribute("iskernel")) {
       F.viewCFG();
-      F.addFnAttr(llvm::Attribute::OptimizeNone);
-      F.addFnAttr(llvm::Attribute::NoInline);
     }
     return llvm::PreservedAnalyses::all();
   }
