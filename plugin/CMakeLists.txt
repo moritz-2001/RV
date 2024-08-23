@@ -11,3 +11,5 @@ add_llvm_pass_plugin(RVPLUG
   BUILDTREE_ONLY
  )
 target_link_libraries(RVPLUG PRIVATE RV)
+
+install (IMPORTED_RUNTIME_ARTIFACTS RVPLUG)
