@@ -138,7 +138,7 @@ void rv::addConfiguredRVPasses(PassBuilder &PB) {
           llvm::OptimizationLevel Level) {
           llvm::FunctionPassManager FPM;
           MPM.addPass(rv::WFVWrapperPass());
-          FPM.addPass(PrintPass());
+        // FPM.addPass(PrintPass());
           rv::addCleanupPasses(MPM);
           MPM.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(FPM)));
       });
