@@ -272,8 +272,14 @@ bool LoopVectorizer::scoreLoop(LoopJob &LJ, LoopScore &LS, Loop &L) {
     return false;
   }
 
-  if (not mdAnnot.isWorkItemLoop) {
-    Report() << L.getName() << " is not work item loop\n";
+  if (llvm::findOptionMDForLoop(&L, "hipSYCL.loop.workitem") == nullptr) {
+/*
+    auto* X = llvm::findOptionMDForLoop(&L, "hipSYCL.loop.workitem");
+    if (X) {
+      outs() << "IS WI LOOP\n";
+    }
+    outs() << L.getName() << " is not work item loop\n";
+    */
     return false;
   }
 
