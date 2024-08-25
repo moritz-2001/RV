@@ -3433,20 +3433,33 @@ void NatBuilder::vectorizeRealReductionCall(llvm::CallInst *rvCall) {
   // non-uniform arg
   auto * vecVal = requestVectorValue(vecArg);
 
-  llvm::outs() << "REDUCTION \n";
-
-  assert(vecArg->getType()->isIntegerTy());
-  CallInst* val = nullptr;
-  if (redType == 0) {
-    val = builder.CreateAddReduce(vecVal);
-  } else if (redType == 1) {
-    val = builder.CreateMulReduce(vecVal);
-  } else if (redType == 2) {
-    val = builder.CreateIntMinReduce(vecVal);
-  } else if (redType == 3) {
-    val = builder.CreateIntMaxReduce(vecVal);
+  Value* val = nullptr;
+  if (vecArg->getType()->isIntegerTy()) {
+    const bool isSigned = llvm::dyn_cast<IntegerType>(vecArg->getType())->getSignBit() > 0;
+    if (redType == 0) {
+      val = builder.CreateAddReduce(vecVal);
+    } else if (redType == 1) {
+      val = builder.CreateMulReduce(vecVal);
+    } else if (redType == 2) {
+      val = builder.CreateIntMinReduce(vecVal, isSigned);
+    } else if (redType == 3) {
+      val = builder.CreateIntMaxReduce(vecVal, isSigned);
+    } else {
+      assert(false and "reduction wrong input");
+    }
   } else {
-    assert(false and "reduction wrong input");
+    assert(vecArg->getType()->isFloatingPointTy());
+    if (redType == 0) {
+      val = builder.CreateFAddReduce(ConstantFP::getNegativeZero(vecArg->getType()), vecVal);
+    } else if (redType == 1) {
+      val = builder.CreateFMulReduce(ConstantFP::get(vecArg->getType(), 1.0), vecVal);
+    } else if (redType == 2) {
+      val = builder.CreateFPMinReduce(vecVal);
+    } else if (redType == 3) {
+      val = builder.CreateFPMaxReduce(vecVal);
+    } else {
+      assert(false and "reduction wrong input");
+    }
   }
   assert(val and "val is nullptr");
   mapScalarValue(rvCall, val);
