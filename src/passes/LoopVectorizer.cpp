@@ -824,7 +824,7 @@ bool LoopVectorizer::run() {
 
   // TODO translate fast-math flag to ULP error bound
   if (!CheckFlag("RV_NO_SLEEF")) {
-    addSleefResolver(RVConfig, platInfo);
+    //addSleefResolver(RVConfig, platInfo);
   }
 
   // enable inter-procedural vectorization
