@@ -257,6 +257,11 @@ VectorShapeTransformer::computeIdealShapeForInst(const Instruction& I, SmallValV
         return VectorShape::varying(); // calling a non-function
       }
 
+       if (IsIntrinsic(call, RVIntrinsic::IsUniform)
+         ) {
+        return VectorShape::uni();
+      }
+
       // memcpy shape is uniform if src ptr shape is uniform
       // TODO re-factor into resolver
       Intrinsic::ID id = callee->getIntrinsicID();
