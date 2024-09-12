@@ -46,6 +46,8 @@ namespace rv {
     Align = 105, // rv_align(V, C) informs RV that V has the alignment constant C
 
     Reduce = 200,
+
+    IsUniform = 400,
   };
 
   VectorMapping GetIntrinsicMapping(llvm::Function&, RVIntrinsic rvIntrin);

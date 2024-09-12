@@ -306,6 +306,7 @@ lowerIntrinsicCall(CallInst* call) {
     case RVIntrinsic::Extract:
     case RVIntrinsic::Shuffle:
     case RVIntrinsic::Align:
+    case RVIntrinsic::IsUniform:
     case RVIntrinsic::Reduce:
     case RVIntrinsic::Compact: {
       lowerIntrinsicCall(call, [] (const CallInst* call) {

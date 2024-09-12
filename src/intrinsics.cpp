@@ -83,7 +83,7 @@ bool
 IsIntrinsic(const llvm::Value& val, RVIntrinsic id) {
   const auto * func = GetCallee(val);
   if (!func) return false;
-  return func->getName().startswith(GetIntrinsicName(id));
+  return func->getName().contains(GetIntrinsicName(id));
 }
 
 
@@ -128,6 +128,18 @@ GetIntrinsicMapping(Function & func, RVIntrinsic rvIntrin) {
         CallPredicateMode::SafeWithoutPredicate
       ));
     } break;
+
+  case RVIntrinsic::IsUniform: {
+    return (VectorMapping(
+      &func,
+      &func,
+      0, // no specific vector width
+      -1, //
+      VectorShape::varying(),
+      {VectorShape::varying()},
+      CallPredicateMode::SafeWithoutPredicate
+    ));
+  } break;
 
     case RVIntrinsic::Extract: {
       return (VectorMapping(

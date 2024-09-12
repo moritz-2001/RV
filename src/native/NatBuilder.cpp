@@ -458,6 +458,7 @@ void NatBuilder::vectorize(BasicBlock *const bb, BasicBlock *vecBlock) {
         case RVIntrinsic::Any: vectorizeReductionCall(call, false); break;
         case RVIntrinsic::All: vectorizeReductionCall(call, true); break;
         case RVIntrinsic::Reduce: vectorizeRealReductionCall(call); break;
+        case RVIntrinsic::IsUniform: vectorizeIdentity(call); break;
         case RVIntrinsic::Extract: vectorizeExtractCall(call); break;
         case RVIntrinsic::Insert: vectorizeInsertCall(call); break;
         case RVIntrinsic::Compact: vectorizeCompactCall(call); break;
@@ -3463,6 +3464,15 @@ void NatBuilder::vectorizeRealReductionCall(llvm::CallInst *rvCall) {
   }
   assert(val and "val is nullptr");
   mapScalarValue(rvCall, val);
+}
+
+void NatBuilder::vectorizeIdentity(llvm::CallInst *rvCall) {
+  ++numRVIntrinsics;
+
+  assert(rvCall->arg_size() == 1 && "expected 1 arguments for rv_is_uniform(vec)");
+  Value *vecArg = rvCall->getArgOperand(0);
+
+  mapScalarValue(rvCall, requestScalarValue(vecArg));
 }
 
 int
