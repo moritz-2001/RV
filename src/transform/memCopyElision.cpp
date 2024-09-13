@@ -92,15 +92,14 @@ MemCopyElision::createBaseGEP(llvm::Value * ptrVal, llvm::Type * baseTy, llvm::I
 
   auto * gep = llvm::cast<llvm::GetElementPtrInst>(ptrVal);
   auto * dataTy = gep->getSourceElementType();
-  idxList.push_back(nullInt);
 
   while (dataTy != baseTy) {
     dataTy = dataTy->getStructElementType(0);
     idxList.push_back(nullInt);
   }
-  if (idxList.size() == 1) return ptrVal;
+  if (idxList.size() == 0) return ptrVal;
   else {
-    auto * baseGep = builder.CreateGEP(dataTy, ptrVal, idxList, "basegep");
+    auto * baseGep = builder.CreateGEP(baseTy, ptrVal, idxList, "basegep");
     vecInfo.setVectorShape(*baseGep, VectorShape::varying());
     return baseGep;
   }
