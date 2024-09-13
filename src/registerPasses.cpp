@@ -129,7 +129,7 @@ void rv::addConfiguredRVPasses(PassBuilder &PB) {
         if (rvVectorizeEnabled) {
           FPM.addPass(rv::LoopVectorizerWrapperPass());
         }
-        FPM.addPass(LowerRVIntrinsicsWrapperPass());
+      //  FPM.addPass(LowerRVIntrinsicsWrapperPass());
       });
 
 
