@@ -268,35 +268,13 @@ bool LoopVectorizer::scoreLoop(LoopJob &LJ, LoopScore &LS, Loop &L) {
   LoopMD mdAnnot = GetLoopAnnotation(L);
 
   if (mdAnnot.alreadyVectorized.safeGet(false)) {
-    Report() << L.getName() << " already vectorized\n";
+    llvm::outs() << L.getName() << " already vectorized\n";
     return false;
   }
 
-  if (llvm::findOptionMDForLoop(&L, "hipSYCL.loop.workitem") == nullptr) {
-/*
-    auto* X = llvm::findOptionMDForLoop(&L, "hipSYCL.loop.workitem");
-    if (X) {
-      outs() << "IS WI LOOP\n";
-    }
-    outs() << L.getName() << " is not work item loop\n";
-    */
+  if (not L.getBlocks()[0]->getParent()->hasFnAttribute("iskernel")) {
     return false;
   }
-
-  const bool containsIntrinsic = [&] {
-    for (auto& BB : F) {
-      for (auto& I : BB) {
-        if (GetIntrinsicID(I) !=  RVIntrinsic::Unknown) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }();
-  if (not containsIntrinsic) {
-    return false;
-  }
-
 
   // Preserve user intent.
   if (mdAnnot.vectorizeEnable.safeGet(false))
@@ -842,8 +820,10 @@ bool LoopVectorizer::run() {
   // Step 1: cost, legal, collect loopb jobs
   auto &LI = PMS.FAM.getResult<LoopAnalysis>(F);
   bool FoundAnyLoops = collectLoopJobs(LI);
-  if (!FoundAnyLoops)
+  if (!FoundAnyLoops) {
+    llvm::outs() << "DID NOT FIND ANY LOOPS TO VECTORIZE: " << F.getName() << "\n";
     return false;
+  }
 
   // Step 2: Refactor loop for vectorization
   bool PrepOK =
