@@ -336,15 +336,26 @@ void NatBuilder::vectorize(bool embedRegion, ValueToValueMapTy * vecInstMap) {
       auto I = oldBB->begin();
 
       if (!I->getType()->isVoidTy()) {
-        //outs() << "REPLACE USES OF " << *I << "\n";
-        for (auto user : I->users()) {
-          if (auto instr = dyn_cast<llvm::Instruction>(user)) {
-            if (std::all_of(oldBlocks.begin(), oldBlocks.end(), [&](BasicBlock* BB) {
-              return instr->getParent() != I->getParent();
-            })) {
-              //outs() << "REPLACE " << *I << " WITH " << *(*vecInstMap)[&*I] << "\n";
-              instr->replaceUsesOfWith(&*I, (*vecInstMap)[&*I]);
-            }
+        for (auto U : I->users()) {
+          if (!vecInfo.inRegion(*cast<Instruction>(U)->getParent())) {
+            repairOutsideUses(*I, [&](Value &usedVal, BasicBlock &) -> Value & {
+              IF_DEBUG_NAT {
+                errs() << "\t repair outside use for " << usedVal
+                       << " formerly scalar " << *I;
+              }
+              if (usedVal.getType()->isVectorTy() &&
+                  !I->getType()->isVectorTy()) {
+                IF_DEBUG_NAT { errs() << " by extracting last element\n"; }
+                builder.SetInsertPoint(
+                    cast<Instruction>(usedVal).getParent()->getTerminator());
+                return *builder.CreateExtractElement(&usedVal,
+                                                     vectorWidth() - 1);
+              }
+              IF_DEBUG_NAT { errs() << " by reusing scalar value\n"; }
+
+              return usedVal;
+            });
+            break;
           }
         }
         I->replaceAllUsesWith(UndefValue::get(I->getType()));
