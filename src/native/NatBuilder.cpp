@@ -808,38 +808,84 @@ bool IsVectorizableTy(const Type & ty) {
   return ty.isPointerTy() || ty.isIntegerTy() || ty.isFloatingPointTy();
 }
 
-void NatBuilder::vectorizeAlloca(AllocaInst *const allocaInst) {
-  auto allocAlign = allocaInst->getAlign();
-  auto * allocTy = allocaInst->getAllocatedType();
+void NatBuilder::vectorizeAlloca(AllocaInst *const SrcAlloca) {
 
   ++numSlowAllocas;
 
-  auto name = allocaInst->getName();
-  if (!allocaInst->isArrayAllocation()) {
-    auto indexTy = getIndexTy(allocaInst);
+  auto name = SrcAlloca->getName();
+  if (!SrcAlloca->isArrayAllocation()) {
+    // Moved in from POCL
+    auto indexTy = getIndexTy(SrcAlloca);
 
-    // TODO support array allocation
-    // auto * scaElemCount = allocaInst->getArraySize();
-    // if (getVectorShape(*scaElemCount).isUniform()) {
-    // auto * vecElemCount = requestScalarValue(scaElemCount);
+    auto *ElementType = SrcAlloca->getAllocatedType();
+    auto *AllocType = ElementType;
+
+    unsigned Alignment = SrcAlloca->getAlign().value();
+    uint64_t StoreSize = layout.getTypeStoreSize(SrcAlloca->getAllocatedType());
+
+    if ((Alignment > 1) && (StoreSize & (Alignment - 1))) {
+      uint64_t AlignedSize = (StoreSize & (~(Alignment - 1))) + Alignment;
+
+      assert(AlignedSize > StoreSize);
+      uint64_t RequiredExtraBytes = AlignedSize - StoreSize;
+
+      // n-dim context array: In case the elementType itself is an array or
+      // a struct, we must take into account it could be alloca-ed with
+      // alignment and loads or stores might use vectorized instructions
+      // expecting proper alignment.
+      // Because of that, we cannot simply allocate vectorWidth*(size), but must
+      // pad the inner row to ensure the alignment to the next element.
+      if (isa<ArrayType>(ElementType)) {
+
+        ArrayType *StructPadding = ArrayType::get(
+            Type::getInt8Ty(builder.getContext()), RequiredExtraBytes);
+
+        std::vector<Type *> PaddedStructElements;
+        PaddedStructElements.push_back(ElementType);
+        PaddedStructElements.push_back(StructPadding);
+        const ArrayRef<Type *> NewStructElements(PaddedStructElements);
+        AllocType = StructType::get(builder.getContext(), NewStructElements, true);
+        uint64_t NewStoreSize = layout.getTypeStoreSize(AllocType);
+        assert(NewStoreSize == AlignedSize);
+
+      } else if (isa<StructType>(ElementType)) {
+        StructType *OldStruct = dyn_cast<StructType>(ElementType);
+
+        ArrayType *StructPadding = ArrayType::get(
+            Type::getInt8Ty(builder.getContext()), RequiredExtraBytes);
+        std::vector<Type *> PaddedStructElements;
+        for (unsigned j = 0; j < OldStruct->getNumElements(); j++)
+          PaddedStructElements.push_back(OldStruct->getElementType(j));
+        PaddedStructElements.push_back(StructPadding);
+        const ArrayRef<Type *> NewStructElements(PaddedStructElements);
+        AllocType = StructType::get(OldStruct->getContext(), NewStructElements,
+                                    OldStruct->isPacked());
+        uint64_t NewStoreSize = layout.getTypeStoreSize(AllocType);
+        assert(NewStoreSize == AlignedSize);
+      }
+    }
+
+
     auto * scaleFactor = ConstantInt::get(indexTy, vectorWidth());
 
-    auto * baseAlloca = builder.CreateAlloca(allocTy, allocaInst->getType()->getAddressSpace(), scaleFactor, name + ".scaled_alloca");
-    baseAlloca->setAlignment(llvm::Align(allocAlign));
+    auto * baseAlloca = builder.CreateAlloca(AllocType, SrcAlloca->getAddressSpace(), scaleFactor, name + ".scaled_alloca");
+    baseAlloca->setAlignment(llvm::Align(64));
 
     // extract basePtrs
     auto * offsetVec = createContiguousVector(vectorWidth(), indexTy, 0, 1);
-    auto * allocaPtrVec = builder.CreateGEP(allocTy, baseAlloca, offsetVec, name + ".alloca_vec");
+    auto * allocaPtrVec = builder.CreateGEP(AllocType, baseAlloca, offsetVec, name + ".alloca_vec");
 
     // register as vectorized alloca
-    mapVectorValue(allocaInst, allocaPtrVec);
+    mapVectorValue(SrcAlloca, allocaPtrVec);
     return;
+  } else {
+    assert(false);
   }
 
   // TODO implement a batter vectorization scheme
 
   // fallback code path
-  replicateInstruction(allocaInst);
+  replicateInstruction(SrcAlloca);
 }
 
 void NatBuilder::vectorizeAtomicRMW(AtomicRMWInst *const atomicrmw) {
