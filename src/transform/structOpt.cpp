@@ -489,6 +489,12 @@ StructOpt::shouldPromote(llvm::AllocaInst & allocaInst) {
       IF_DEBUG_SO { errs() << "\t non-load/store user " << *inst << " -> can not promote\n";}
       return false;
     }
+    if (load) {
+      if (load->getType() != allocaInst.getAllocatedType()) {
+        IF_DEBUG_SO { errs() << "\t load type != alloca type: " << *allocaInst.getAllocatedType() << " != " << *load->getType() << "\n";}
+        return false;
+      }
+    }
     if (store) {
       if (store->getValueOperand() == &allocaInst) {
         IF_DEBUG_SO { errs() << "\t alloca value stored away -> can not promote\n"; }

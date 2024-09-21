@@ -86,6 +86,12 @@ bool SplitAllocas::analyseUses(Instruction * inst, Type * type) {
         IF_DEBUG_SA { errs() << "skip: unforeseen use" << *userInst << "\n"; }
         return false;
       }
+      if (load && dyn_cast<llvm::AllocaInst>(inst)) {
+        if (load->getType() != dyn_cast<llvm::AllocaInst>(inst)->getAllocatedType()) {
+          IF_DEBUG_SA { errs() << "\t load type != alloca type: " << *dyn_cast<llvm::AllocaInst>(inst)->getAllocatedType() << " != " << *load->getType() << "\n";}
+          return false;
+        }
+      }
     }
   }
 
