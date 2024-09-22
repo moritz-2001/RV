@@ -298,7 +298,7 @@ public:
     // dont test "phi", but "phi-1" if the cmp predicate is exit on equal
     int offByOne = redShape.getStride() < 0 ? -1 : 1;
 
-    //offset = offset + offByOne * (exitWhenEqual ? 1 : 0);
+    offset = offset + offByOne * (exitWhenEqual ? 1 : 0);
 
   // emit the test
     auto & val = embReduct.val;
@@ -491,7 +491,7 @@ struct LoopTransformer {
   , LI(_LI)
   , ScalarL(_ScalarL)
   , ClonedL(_ClonedL)
-  , useTailPredication(_useTailPredication)
+  , useTailPredication(false)
   , AVL(nullptr)
   , exitConditionBuilder(_exitBuilder)
   , vecValMap(_vecValMap)
@@ -726,7 +726,7 @@ struct LoopTransformer {
     IRBuilder<> builder(&vecHead, vecHead.getTerminator()->getIterator());
 
     // for tail predication, stay inside the loop while there is at least one iteration remaining
-    unsigned exitTriggerIteration = useTailPredication ? vectorWidth : 2 * vectorWidth;
+    unsigned exitTriggerIteration = vectorWidth;
 
     auto & exitVal =
       exitConditionBuilder.synthesize(exitTriggerIteration, ".vecExit", builder, &uniOverrides,
@@ -803,46 +803,6 @@ struct LoopTransformer {
     }
     const unsigned VectorLoopThreshold = vectorWidth; // std::min(vectorWidth, 8);
 
-    // synthesize(int iterOffset, std::string suffix, IRBuilder<> & builder, std::function<Instruction& (Instruction&)> embedFunc) {
-    auto & exitVal =
-      exitConditionBuilder.synthesize(VectorLoopThreshold, ".vecGuard", builder, nullptr,
-         [&](Instruction & inst) -> IterValue {
-           assert (!isa<CallInst>(inst));
-
-           IF_DEBUG { errs() << inst << "\n"; }
-
-           // loop invariant value
-           if (!ScalarL.contains(inst.getParent())) return IterValue(inst, 0);
-
-           // did we hit the header phi
-           auto itHeaderPhi = valShapes.find(&inst);
-
-           // determine the shape of the tested iteration variable
-           PHINode * headerPhi = nullptr;
-           int offset = 0;
-           if (itHeaderPhi != valShapes.end()) {
-             // we are checking the header phi directly
-             headerPhi = cast<PHINode>(&inst);
-           } else {
-             // we checking the reductor result on the header phi (next iteration value)
-             assert(reductors.find(&inst) != reductors.end() && "not testing a reductor");
-             auto * matchingHeaderPhi = reductors[&inst];
-             headerPhi = matchingHeaderPhi;
-             // we are testing the reductor that evaluates to the next iteration value
-             offset = -1; // phi is at iteration -1
-           }
-
-           // translate to vector loopt
-           auto & vecPhi = cast<PHINode>(LookUp(vecValMap, *headerPhi));
-
-           // FIXME don't reconstruct the init value -> map this somewhere before the transformation
-           int initIdx = vecPhi.getBasicBlockIndex(vecGuardBlock);
-           auto * initVal = vecPhi.getIncomingValue(initIdx);
-
-           return IterValue(*initVal, offset);
-          }
-      );
-
     // use forwarded exit condition
     vecGuardBr.setCondition(ConstantInt::getFalse(builder.getContext()));
   }
@@ -861,44 +821,6 @@ struct LoopTransformer {
     IRBuilder<> builder(vecToScalarExit, vecToScalarExit->getTerminator()->getIterator());
 
     auto & vecExitBr = *cast<BranchInst>(vecToScalarExit->getTerminator());
-
-    // Whether we need control from the vector loop exit to the scalar loop.
-    if (!useTailPredication && (tripAlign % vectorWidth != 0)) {
-      IF_DEBUG { errs() << "remTrans: need a scalar remainder loop.\n"; }
-      // replicate the exit condition
-      // replace scalar reductors with their vector-loop versions
-      auto & exitVal =
-        ReplicateExpression(".v2s", *exitingBr.getCondition(), replMap,
-           [&](Instruction & inst, IRBuilder<>&) -> Value* {
-             // loop invariant value
-             if (!ScalarL.contains(inst.getParent())) return &inst;
-
-             // if we hit a reduction/induction value replace it with its vector version
-             if (isa<PHINode>(inst) || reda.getStrideInfo(inst) || reda.getReductionInfo(inst)) {
-               auto * loopVal = &LookUp(vecValMap, inst);
-               auto * lcssaPhi = PHINode::Create(loopVal->getType(), 1, inst.getName().str() + ".lscca", &*vecToScalarExit->begin());
-               lcssaPhi->addIncoming(loopVal, &vecExiting);
-               return lcssaPhi;
-             }
-
-             // Otw, copy that operation
-             return nullptr;
-            },
-        builder
-        );
-
-      // We always exit to the loop exit and not to the scalarGuardBlock
-      vecExitBr.setCondition(llvm::ConstantInt::getTrue(builder.getContext()));
-
-      // swap the exits to negate the condition
-      if (exitSuccIdx == 0) {
-        vecExitBr.setSuccessor(0, loopExit);
-        vecExitBr.setSuccessor(1, scalarGuardBlock);
-      }
-
-      return;
-
-    }
 
     // the scalar loop is never executed (full SIMD vectors for all iteration or
     // we are using tail predication for the vector loop)
