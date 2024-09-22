@@ -810,6 +810,23 @@ bool IsVectorizableTy(const Type & ty) {
 
 void NatBuilder::vectorizeAlloca(AllocaInst *const SrcAlloca) {
 
+  auto createGEP = [&, this](llvm::AllocaInst *Alloca, bool AlignPadding,
+                          llvm::Value *ContIndex) {
+    std::vector<llvm::Value *> GEPArgs;
+    GEPArgs.push_back(ContIndex);
+
+    if (AlignPadding)
+      GEPArgs.push_back(llvm::ConstantInt::get(
+          llvm::Type::getInt32Ty(builder.getContext()), 0));
+
+    llvm::GetElementPtrInst *GEP = dyn_cast<llvm::GetElementPtrInst>(
+        builder.CreateGEP(Alloca->getAllocatedType(), Alloca, GEPArgs));
+
+    assert(GEP != nullptr);
+
+    return GEP;
+  };
+
   ++numSlowAllocas;
 
   auto name = SrcAlloca->getName();
@@ -822,6 +839,7 @@ void NatBuilder::vectorizeAlloca(AllocaInst *const SrcAlloca) {
 
     unsigned Alignment = SrcAlloca->getAlign().value();
     uint64_t StoreSize = layout.getTypeStoreSize(SrcAlloca->getAllocatedType());
+    bool PaddingAdded = false;
 
     if ((Alignment > 1) && (StoreSize & (Alignment - 1))) {
       uint64_t AlignedSize = (StoreSize & (~(Alignment - 1))) + Alignment;
@@ -847,6 +865,7 @@ void NatBuilder::vectorizeAlloca(AllocaInst *const SrcAlloca) {
         AllocType = StructType::get(builder.getContext(), NewStructElements, true);
         uint64_t NewStoreSize = layout.getTypeStoreSize(AllocType);
         assert(NewStoreSize == AlignedSize);
+        PaddingAdded = true;
 
       } else if (isa<StructType>(ElementType)) {
         StructType *OldStruct = dyn_cast<StructType>(ElementType);
@@ -862,6 +881,7 @@ void NatBuilder::vectorizeAlloca(AllocaInst *const SrcAlloca) {
                                     OldStruct->isPacked());
         uint64_t NewStoreSize = layout.getTypeStoreSize(AllocType);
         assert(NewStoreSize == AlignedSize);
+        PaddingAdded = true;
       }
     }
 
@@ -873,7 +893,7 @@ void NatBuilder::vectorizeAlloca(AllocaInst *const SrcAlloca) {
 
     // extract basePtrs
     auto * offsetVec = createContiguousVector(vectorWidth(), indexTy, 0, 1);
-    auto * allocaPtrVec = builder.CreateGEP(AllocType, baseAlloca, offsetVec, name + ".alloca_vec");
+    auto * allocaPtrVec = createGEP(baseAlloca, PaddingAdded, offsetVec);
 
     // register as vectorized alloca
     mapVectorValue(SrcAlloca, allocaPtrVec);
