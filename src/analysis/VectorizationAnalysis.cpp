@@ -167,7 +167,9 @@ void VectorizationAnalysis::pushPHINodes(const BasicBlock &Block) {
   const Join *allocaJoin = allocaSSA.getJoinNode(Block);
   if (allocaJoin) {
     for (const auto *allocInst : allocaJoin->provSet.allocs) {
-      updateShape(*allocInst, VectorShape::varying());
+      if (vecInfo.inRegion(*allocInst)) {
+        updateShape(*allocInst, VectorShape::varying());
+      }
     }
   }
 
